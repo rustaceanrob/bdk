@@ -3854,3 +3854,11 @@ fn test_tx_cancellation() {
         .unwrap();
     assert_eq!(change_derivation_4, (KeychainKind::Internal, 2));
 }
+
+#[test]
+fn test_thread_safety() {
+    fn thread_safe<T: Send + Sync>(_wallet: T) {}
+    let wallet = Wallet::new_no_persist("wpkh(tpubEBr4i6yk5nf5DAaJpsi9N2pPYBeJ7fZ5Z9rmN4977iYLCGco1VyjB9tvvuvYtfZzjD5A8igzgw3HeWeeKFmanHYqksqZXYXGsw5zjnj7KM9/*)",
+    None, Network::Testnet).unwrap();
+    thread_safe(wallet);
+}
