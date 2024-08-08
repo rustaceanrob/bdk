@@ -18,11 +18,11 @@ pub struct SyncRequest {
     /// [`LocalChain::tip`]: crate::local_chain::LocalChain::tip
     pub chain_tip: CheckPoint,
     /// Transactions that spend from or to these indexed script pubkeys.
-    pub spks: Box<dyn ExactSizeIterator<Item = ScriptBuf> + Send>,
+    pub spks: Box<dyn ExactSizeIterator<Item = ScriptBuf> + Send + Sync>,
     /// Transactions with these txids.
-    pub txids: Box<dyn ExactSizeIterator<Item = Txid> + Send>,
+    pub txids: Box<dyn ExactSizeIterator<Item = Txid> + Send + Sync>,
     /// Transactions with these outpoints or spent from these outpoints.
-    pub outpoints: Box<dyn ExactSizeIterator<Item = OutPoint> + Send>,
+    pub outpoints: Box<dyn ExactSizeIterator<Item = OutPoint> + Send + Sync>,
 }
 
 impl SyncRequest {
@@ -42,7 +42,9 @@ impl SyncRequest {
     #[must_use]
     pub fn set_spks(
         mut self,
-        spks: impl IntoIterator<IntoIter = impl ExactSizeIterator<Item = ScriptBuf> + Send + 'static>,
+        spks: impl IntoIterator<
+            IntoIter = impl ExactSizeIterator<Item = ScriptBuf> + Send + Sync + 'static,
+        >,
     ) -> Self {
         self.spks = Box::new(spks.into_iter());
         self
@@ -54,7 +56,7 @@ impl SyncRequest {
     #[must_use]
     pub fn set_txids(
         mut self,
-        txids: impl IntoIterator<IntoIter = impl ExactSizeIterator<Item = Txid> + Send + 'static>,
+        txids: impl IntoIterator<IntoIter = impl ExactSizeIterator<Item = Txid> + Send + Sync + 'static>,
     ) -> Self {
         self.txids = Box::new(txids.into_iter());
         self
@@ -67,7 +69,7 @@ impl SyncRequest {
     pub fn set_outpoints(
         mut self,
         outpoints: impl IntoIterator<
-            IntoIter = impl ExactSizeIterator<Item = OutPoint> + Send + 'static,
+            IntoIter = impl ExactSizeIterator<Item = OutPoint> + Send + Sync + 'static,
         >,
     ) -> Self {
         self.outpoints = Box::new(outpoints.into_iter());
@@ -81,7 +83,7 @@ impl SyncRequest {
     pub fn chain_spks(
         mut self,
         spks: impl IntoIterator<
-            IntoIter = impl ExactSizeIterator<Item = ScriptBuf> + Send + 'static,
+            IntoIter = impl ExactSizeIterator<Item = ScriptBuf> + Send + Sync + 'static,
             Item = ScriptBuf,
         >,
     ) -> Self {
@@ -96,7 +98,7 @@ impl SyncRequest {
     pub fn chain_txids(
         mut self,
         txids: impl IntoIterator<
-            IntoIter = impl ExactSizeIterator<Item = Txid> + Send + 'static,
+            IntoIter = impl ExactSizeIterator<Item = Txid> + Send + Sync + 'static,
             Item = Txid,
         >,
     ) -> Self {
@@ -111,7 +113,7 @@ impl SyncRequest {
     pub fn chain_outpoints(
         mut self,
         outpoints: impl IntoIterator<
-            IntoIter = impl ExactSizeIterator<Item = OutPoint> + Send + 'static,
+            IntoIter = impl ExactSizeIterator<Item = OutPoint> + Send + Sync + 'static,
             Item = OutPoint,
         >,
     ) -> Self {
@@ -196,7 +198,7 @@ pub struct FullScanRequest<K> {
     /// [`LocalChain::tip`]: crate::local_chain::LocalChain::tip
     pub chain_tip: CheckPoint,
     /// Iterators of script pubkeys indexed by the keychain index.
-    pub spks_by_keychain: BTreeMap<K, Box<dyn Iterator<Item = Indexed<ScriptBuf>> + Send>>,
+    pub spks_by_keychain: BTreeMap<K, Box<dyn Iterator<Item = Indexed<ScriptBuf>> + Send + Sync>>,
 }
 
 impl<K: Ord + Clone> FullScanRequest<K> {
@@ -239,7 +241,9 @@ impl<K: Ord + Clone> FullScanRequest<K> {
     pub fn set_spks_for_keychain(
         mut self,
         keychain: K,
-        spks: impl IntoIterator<IntoIter = impl Iterator<Item = Indexed<ScriptBuf>> + Send + 'static>,
+        spks: impl IntoIterator<
+            IntoIter = impl Iterator<Item = Indexed<ScriptBuf>> + Send + Sync + 'static,
+        >,
     ) -> Self {
         self.spks_by_keychain
             .insert(keychain, Box::new(spks.into_iter()));
@@ -253,7 +257,9 @@ impl<K: Ord + Clone> FullScanRequest<K> {
     pub fn chain_spks_for_keychain(
         mut self,
         keychain: K,
-        spks: impl IntoIterator<IntoIter = impl Iterator<Item = Indexed<ScriptBuf>> + Send + 'static>,
+        spks: impl IntoIterator<
+            IntoIter = impl Iterator<Item = Indexed<ScriptBuf>> + Send + Sync + 'static,
+        >,
     ) -> Self {
         match self.spks_by_keychain.remove(&keychain) {
             // clippy here suggests to remove `into_iter` from `spks.into_iter()`, but doing so
@@ -279,7 +285,7 @@ impl<K: Ord + Clone> FullScanRequest<K> {
         inspect: impl FnMut(K, u32, &Script) + Send + Sync + Clone + 'static,
     ) -> Self
     where
-        K: Send + 'static,
+        K: Send + Sync + 'static,
     {
         for (keychain, spks) in core::mem::take(&mut self.spks_by_keychain) {
             let mut inspect = inspect.clone();
@@ -302,7 +308,7 @@ impl<K: Ord + Clone> FullScanRequest<K> {
         mut inspect: impl FnMut(u32, &Script) + Send + Sync + 'static,
     ) -> Self
     where
-        K: Send + 'static,
+        K: Send + Sync + 'static,
     {
         if let Some(spks) = self.spks_by_keychain.remove(&keychain) {
             self.spks_by_keychain.insert(
