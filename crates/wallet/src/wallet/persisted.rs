@@ -15,11 +15,11 @@ impl<'c> chain::PersistAsyncWith<sqlx::Transaction<'c, sqlx::Postgres>> for Wall
     type LoadError = LoadWithPersistError<sqlx::Error>;
     type PersistError = sqlx::Error;
 
-    async fn create(
+    fn create(
         db: &mut sqlx::Transaction<'c, sqlx::Postgres>,
         params: Self::CreateParams,
-    ) -> Result<Self, Self::CreateError> {
-        // Box::pin(async move {
+    ) -> FutureResult<Self, Self::CreateError> {
+        Box::pin(async move {
             let mut wallet = Self::create_with_params(params).map_err(CreateWithPersistError::Descriptor)?;
             if let Some(changeset) = wallet.take_staged() {
                 changeset
@@ -28,14 +28,14 @@ impl<'c> chain::PersistAsyncWith<sqlx::Transaction<'c, sqlx::Postgres>> for Wall
                     .map_err(CreateWithPersistError::Persist)?;
             }
             Ok(wallet)
-        // })
+        })
     }
 
-    async fn load(
+    fn load(
         conn: &mut sqlx::Transaction<'c, sqlx::Postgres>,
         params: Self::LoadParams,
-    ) -> Result<Option<Self>, Self::LoadError> {
-        // Box::pin(async move {
+    ) -> FutureResult<Option<Self>, Self::LoadError> {
+        Box::pin(async move {
             let changeset = crate::ChangeSet::from_postgres(conn)
                 .await
                 .map_err(LoadWithPersistError::Persist)?;
@@ -43,16 +43,16 @@ impl<'c> chain::PersistAsyncWith<sqlx::Transaction<'c, sqlx::Postgres>> for Wall
                 return Ok(None);
             }
             Self::load_with_params(changeset, params).map_err(LoadWithPersistError::InvalidChangeSet)
-        // })
+        })
     }
 
     async fn persist(
         db: &mut sqlx::Transaction<'c, sqlx::Postgres>,
         changeset: &<Self as chain::Staged>::ChangeSet,
-    ) -> Result<(), Self::PersistError> {
-        // Box::pin(async move {
+    ) -> FutureResult<(), Self::PersistError> {
+        Box::pin(async move {
             changeset.persist_to_postgres(&mut *db).await
-        // })
+        })
     }
 }
 
@@ -65,7 +65,7 @@ impl chain::PersistAsyncWith<sqlx::PgPool> for Wallet {
     type LoadError = LoadWithPersistError<sqlx::Error>;
     type PersistError = sqlx::Error;
 
-    async fn create<'a>(
+    fn create<'a>(
         db: &'a mut sqlx::PgPool,
         params: Self::CreateParams,
     ) -> FutureResult<'a, Self, Self::CreateError> {
@@ -77,26 +77,28 @@ impl chain::PersistAsyncWith<sqlx::PgPool> for Wallet {
         })
     }
 
-    async fn load(
+    fn load(
         db: &mut sqlx::PgPool,
         params: Self::LoadParams,
     ) -> Result<Option<Self>, Self::LoadError> {
-        // Box::pin(async move {
+        Box::pin(async move {
             let mut db_tx = db.begin().await.map_err(LoadWithPersistError::Persist)?;
             let wallet_opt = chain::PersistAsyncWith::load(&mut db_tx, params).await?;
             db_tx.commit().await.map_err(LoadWithPersistError::Persist)?;
             Ok(wallet_opt)
-        // })
+        })
     }
 
-    async fn persist(
+    fn persist(
         db: &mut sqlx::PgPool,
         changeset: &<Self as chain::Staged>::ChangeSet,
-    ) -> Result<(), Self::PersistError> {
+    ) -> FutureResult<(), Self::PersistError> {
+        Box::pin(async move {
             let mut db_tx = db.begin().await?;
             changeset.persist_to_postgres(&mut db_tx).await?;
             db_tx.commit().await?;
         Ok(())
+        })
     }
 }
 
